@@ -11,6 +11,7 @@ editor_options:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+#Will write comments to keep track of what I'm doing! :)
 ```
 
 ## One and two sample difference tests
@@ -47,7 +48,18 @@ Load the dataset using read_csv, and also take a look at the two variables of in
 **Task 1** _Load the Pulse data and filter it to only valid responses._
 
 ```{r Task1}
+#Loading and filtering the data to include only valid responses:
+pulse_valid_table<-read_csv("data/pulse_2023.csv")
 
+#Loading in the data dictionary to see what counts as valid. Had to look up how to read an xlsx file in R:
+install.packages("readxl")
+library(readxl)
+data_dictionary<-read_excel("data/pulse2023_data.dictionary_CSV.xlsx")
+#^From this, it looks like for "THHLD_NUMKID" any number from 0-40 is valid, and for "ND_DISPLACE", 1=yes, 2=no, -88=missing, -99=question seen but not reported. So I'll filter those out next below:
+
+pulse_valid_table_filtered<-read_csv("data/pulse_2023.csv") %>%
+  filter(THHLD_NUMKID >=0, THHLD_NUMKID <=40, ND_DISPLACE %in% c(1,2))
+#Noting the number of obs went down by a lot. 
 ```
 
 You'll be conducting a two-sample test of difference to look at whether the number of children differs between those displaced and not displaced. To know which test to use, you have to assess the normality of the THHLD_NUMKID variable. 
@@ -55,7 +67,11 @@ You'll be conducting a two-sample test of difference to look at whether the numb
 **Task 2** _Assess the normality of this variable using either a histogram OR a qq line. Make sure your plot is visible and interpret what it shows you about the normality of this variable._
 
 ```{r Task2}
-
+#I'll use a histogram, and make it coral & purple bc why not:
+ggplot(pulse_valid_table_filtered, aes(x=THHLD_NUMKID)) +
+  geom_histogram(binwidth = 1, fill="coral", color = "purple", linewidth = 0.75) + 
+  labs(title = "Distribution of Children per Household (THHLD_NUMKID)", x = "Number of Children in Household", y = "Number of Households")
+#The histogram shows up to be strongly right-skewed. 
 ```
 
 ### Testing the difference in number of children.
@@ -64,17 +80,26 @@ Now you can test whether the number of children differs between displaced and no
 
 **Task 3** _Based on the normality of the data, what is the appropriate statistical test for determining whether the number of children differs between these two groups? Explain why this test is appropriate and give a null and alternative hypothesis for this test_
 
-{Your answer here}
+The appropriate statistical test to determine whether the number of children differs between the two groups is the Wilcoxon test (rank-sum specifically). The data is strongly right-skewed, and with this test being non-parametric and that we're comparing two different groups without directly comparing their means, this test seems appropriate. The null hypothesis is that the number of children per household is the same for displaced and non-displaced households, whereas the alternative hypothesis is that the distribution of the number of children per household differs between displaced and non-displaced households. 
 
 **Task 4** _Run the test you identified in Task 3. Also calculate the mean for each dataset, which you can use to determine the nature of the difference--which group (if any) has more children._
 
 ```{r Task4}
-
+#Running the test I chose:
+wilcox.test(THHLD_NUMKID ~ ND_DISPLACE, data = pulse_valid_table_filtered)
+#Calculating the mean for each dataset:
+mean_children_calc<- pulse_valid_table_filtered %>%
+  group_by(ND_DISPLACE) %>%
+  summarise(mean_children = mean(THHLD_NUMKID), observations = n())
+#This made a table with the mean children and number of households for each group. 
 ```
 
 **Task 5** _Interpret the results of the analysis you did in task 4._ 
   * Do you reject the null hypothesis? Why or why not? 
   * Based on the test result and the group means, what can we conclude about differences in the number of children between these two groups?
+  
+Since the p-value is extremely small (p-value = 2.463e-12, which is p < 0.05), this is statistically significant, which means we can reject the null hypothesis. This means that there's a statistically significant difference in the distribution of the number of children between the displaced and non-displaced households. Essentially, the distribution of the # of children differs between houses that were displaced or not by natural disasters. 
+The difference in mean_children is 0.7472826 - 0.5944313 = 0.1528513, which means that displaced households has ~0.153 more children per household. Displaced household tend to have slightly more children, on average, compared to non-displaced households. 
 
 ### Identifying differences in time displaced by natural disasters across income groups
 
@@ -85,30 +110,56 @@ Again, look at the data dictionary to better understand how these two variables 
 **Task 6** _Reload the original, unfiltered Pulse dataset (not the one you used in parts 1 and 2). Select only observations for households displaced by a natural disaster using the ND_DISPLACE variable. Then filter for records with valid responses to INCOME and ND_HOWLONG. Call the head of the table with `kable` when done._
 
 ```{r Task6}
+#Loading the original, unfiltered pulse dataset:
+pulse_original_unfiltered<- read_csv("data/pulse_2023.csv")
 
+#Filtering for displaced households with valid responses (INCOME & ND_HOWLONG). I went to check the data dictionary to see which values were valid for each variable:
+pulse_original_unfiltered_displaced<- pulse_original_unfiltered %>%
+  filter(ND_DISPLACE == 1, #1=yes for "displaced"
+         INCOME %in% 1:8, #there were 8 household income categories
+         ND_HOWLONG %in% 1:5) #there were 5 categories showing how long a household was displaced
+#Display the head:
+knitr::kable(head(pulse_original_unfiltered_displaced))
 ```
 
 **Task 7** _Create a contingency table of responses to the ND_HOWLONG variable by INCOME. The rows of this table should be the income groups and the columns should be the categorical variables showing time displaced. Call the table when you are done._
 
 ```{r Task7}
+#Making the contingency table of responses to the ND_HOWLONG variable by INCOME:
+contingency_table<- table(pulse_original_unfiltered_displaced$INCOME, pulse_original_unfiltered_displaced$ND_HOWLONG)
 
+contingency_table
 ```
 
 **Task 8** _Run a chi-square test on your contingency table to assess whether there are statistically significant differences in displacement time between these income groups. You'll likely need to delete the INCOME variable to do so._ 
 
 ```{r Task8}
-
+chisq_test<- chisq.test(contingency_table)
+#to show them here:
+chisq_test
+#Results:
+#X-squared = 210.51, df = 28, p-value < 2.2e-16
 ```
 
 **Task 9** _To help with your interpretation of results, Calculate the percentage of households within each income group that fall into category 1 of ND_HOWLONG ("displaced less than a week")._
 
 ```{r Task9}
-
+#Calculating the percentage of households within each income group that fall into category 1. I think I am supposed to use the task 6 dataframe for this:
+incomepct_cat1<- pulse_original_unfiltered_displaced %>%
+  group_by(INCOME) %>%
+  summarise(
+    total_households = n(),
+    less_than_week_cat1 = sum(ND_HOWLONG ==1),
+    percentage = (less_than_week_cat1 / total_households)*100)
+#I'll show the table here too:
+knitr::kable(incomepct_cat1)
 ```
 
 **Task 10** _Interpret the results of your analysis in tasks 8 and 9._ 
   * Do you reject the null hypothesis based on these results and why (or why not)? 
   * What do your results in Task 9 tell you about differences in how quickly households were able to return?
+  
+Based on my results in task 8 I would reject the null hypothesis because the p-value after running the Chi-Squared test is super small (p-value <2.2e-16). This, one, tells me the significance level is below 0.05, and two, this means that there's statistical significance between household incomes and the amount of time those households were displaced by natural disasters. So, displacement duration is going to differ across the income categories, which is evident in the task 9 table. Based on the percentages within the table, there is a trend of higher-income households being displaced for shorter amount of time (aka less than a week), so that tells me those households would we have to return sooner than those lower-income households. 
 
 ### Challenge Question:
 Calculate and map the percentage of households reporting displacement (ND_DISPLACE) by state. To do so, you'll need to start with a version of the dataset that excludes non-valid responses and then calculate the percentage displaced by state.
@@ -116,15 +167,66 @@ Calculate and map the percentage of households reporting displacement (ND_DISPLA
 Once you've calculated that estimate, map it out using the `states_albers` geopackage file in the data folder. Provide a brief description of the patterns you observe.
 
 ```{r}
-#Code goes here
+#Filtering first:
+pulse_displace_good<- pulse_original_unfiltered %>%
+  filter(ND_DISPLACE %in% c(1,2))
+#Calculating the % of households displaced by state:
+pct_dis_by_state<- pulse_displace_good %>%
+  group_by(EST_ST) %>% #NOTE the EST_ST is fips codes!
+  summarise(
+    total_households = n(),
+    displaced_households = sum(ND_DISPLACE == 1),
+    percent_displaced = (displaced_households/total_households)*100)
+knitr::kable(pct_dis_by_state)
+
+#Loading the geopackage (state boundaries)
+library(sf)
+states_boundaries<- st_read("data/states_albers.gpkg") #NOTE that this includes fips codes and state names!
+
+#I am looking to use a join later, but first I think i have to convert fips codes to state names? Had to do some googling to figure this out, I'm sure there's a better way out there to match fips codes and states names but oh well. 
+state_match_table <- data.frame(
+  EST_ST = c(
+    "01", "02", "04", "05", "06", "08", "09", "10",
+    "12", "13", "15", "16", "17", "18", "19", "20",
+    "21", "22", "23", "24", "25", "26", "27", "28",
+    "29", "30", "31", "32", "33", "34", "35", "36",
+    "37", "38", "39", "40", "41", "42", "44", "45",
+    "46", "47", "48", "49", "50", "51", "53", "54",
+    "55", "56"),STATE = state.name)
+#The joining part:
+pct_dis_by_state_join<- pct_dis_by_state %>%
+  left_join(state_match_table, by = "EST_ST")
+
+pct_boundaries_join<- states_boundaries %>%
+  left_join(pct_dis_by_state_join, by = "STATE")
+#after running this part i get an error, there are 2 columns: STATE.x and STATE.y because I was doing trials and errors and R for some reason wanted to keep it there even though I deleted previous "joining" code" I'll just rename one of the columns and delete the other:
+pct_dis_by_state_join<- pct_dis_by_state_join %>%
+  rename(STATE = STATE.y)
+pct_dis_by_state_join <- pct_dis_by_state_join %>%
+  select(-STATE.x)
+
+#RERUN of after the issue:
+pct_boundaries_join<- states_boundaries %>%
+  left_join(pct_dis_by_state_join, by = "STATE")
+
+#MAPPING TIME (finally):
+library(ggplot2)
+ggplot(pct_boundaries_join) +
+  geom_sf(aes(fill = percent_displaced)) +
+  scale_fill_gradient(
+    low = "lightpink",
+    high = "lightblue",
+    na.value = "lightyellow") +
+  labs(title = "Percentage of households Displaced by Natural Disasters", fill = "Displaced (%)")
+#I love the cotton candy colors :D
 ```
 
 ### Final submission stuff
 
 **Disclosure of assistance:** Besides class materials, what other sources of assistance did you use while completing this lab? These can include input from classmates, relevant material identified through web searches (e.g., Stack Overflow), or assistance from ChatGPT or other AI tools. How did these sources support your own learning in completing this lab?
 
-{Response here.}
+I used Google to assisting me when converting the FIPS codes to state names before all of the joining parts (referencing the challenge item here). I was doing lot's of trial and error with this part and I originally got a join table that has all NA's for the percent displaced. It was a whole jargon but I eventually just used help from Google to get it right -- Now I know for next time! This supported my own learning in this lab as I now know a less complicated (yet more tedious) way of converting these codes to names when the given datasets use different names when listing states. 
 
 **Lab reflection:** How do you feel about the work you did on this lab? Was it easy, moderate, or hard? What are the biggest things you learned by completing it?
 
-{Your response here}
+I'd say this lab on a scale of 1-10 was about a 7. Yes there were lots of tasks, but they were short. The interpretations of statistical values took me some time and looking back to slides in order to get a defensible answer. When my results showed up, I didn't immediately know what they meant, which added time into me completing this lab. I also tackled the challenge item this time, and this was giving me all the troubles that I sort of listed in the Disclosure of Assistance part. I originally used tmap and that was taking too long and lots of mistakes; I ended up using ggplot and should have from the start. 
