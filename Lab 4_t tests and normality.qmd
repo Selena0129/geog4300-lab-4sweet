@@ -52,7 +52,6 @@ Load the dataset using read_csv, and also take a look at the two variables of in
 pulse_valid_table<-read_csv("data/pulse_2023.csv")
 
 #Loading in the data dictionary to see what counts as valid. Had to look up how to read an xlsx file in R:
-install.packages("readxl")
 library(readxl)
 data_dictionary<-read_excel("data/pulse2023_data.dictionary_CSV.xlsx")
 #^From this, it looks like for "THHLD_NUMKID" any number from 0-40 is valid, and for "ND_DISPLACE", 1=yes, 2=no, -88=missing, -99=question seen but not reported. So I'll filter those out next below:
@@ -197,15 +196,6 @@ state_match_table <- data.frame(
 pct_dis_by_state_join<- pct_dis_by_state %>%
   left_join(state_match_table, by = "EST_ST")
 
-pct_boundaries_join<- states_boundaries %>%
-  left_join(pct_dis_by_state_join, by = "STATE")
-#after running this part i get an error, there are 2 columns: STATE.x and STATE.y because I was doing trials and errors and R for some reason wanted to keep it there even though I deleted previous "joining" code" I'll just rename one of the columns and delete the other:
-pct_dis_by_state_join<- pct_dis_by_state_join %>%
-  rename(STATE = STATE.y)
-pct_dis_by_state_join <- pct_dis_by_state_join %>%
-  select(-STATE.x)
-
-#RERUN of after the issue:
 pct_boundaries_join<- states_boundaries %>%
   left_join(pct_dis_by_state_join, by = "STATE")
 
